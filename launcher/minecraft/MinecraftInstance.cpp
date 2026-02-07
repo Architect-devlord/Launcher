@@ -1022,7 +1022,12 @@ std::shared_ptr<ModFolderModel> MinecraftInstance::loaderModList() const
 {
     if (!m_loader_mod_list)
     {
-        m_loader_mod_list.reset(new ModFolderModel(modsRoot()));
+        QStringList dirs = {modsRoot()};
+        QString altMods = FS::PathCombine(instanceRoot(), "mods");
+        if (altMods != modsRoot()) {
+            dirs.append(altMods);
+        }
+        m_loader_mod_list.reset(new ModFolderModel(dirs, FS::PathCombine(instanceRoot(), "registered_mods.json")));
         m_loader_mod_list->disableInteraction(isRunning());
         connect(this, &BaseInstance::runningStatusChanged, m_loader_mod_list.get(), &ModFolderModel::disableInteraction);
     }
@@ -1033,7 +1038,12 @@ std::shared_ptr<ModFolderModel> MinecraftInstance::coreModList() const
 {
     if (!m_core_mod_list)
     {
-        m_core_mod_list.reset(new ModFolderModel(coreModsDir()));
+        QStringList dirs = {coreModsDir()};
+        QString altCoreMods = FS::PathCombine(instanceRoot(), "coremods");
+        if (altCoreMods != coreModsDir()) {
+            dirs.append(altCoreMods);
+        }
+        m_core_mod_list.reset(new ModFolderModel(dirs));
         m_core_mod_list->disableInteraction(isRunning());
         connect(this, &BaseInstance::runningStatusChanged, m_core_mod_list.get(), &ModFolderModel::disableInteraction);
     }
@@ -1044,7 +1054,12 @@ std::shared_ptr<ModFolderModel> MinecraftInstance::resourcePackList() const
 {
     if (!m_resource_pack_list)
     {
-        m_resource_pack_list.reset(new ResourcePackFolderModel(resourcePacksDir()));
+        QStringList dirs = {resourcePacksDir()};
+        QString altResourcePacks = FS::PathCombine(instanceRoot(), "resourcepacks");
+        if (altResourcePacks != resourcePacksDir()) {
+            dirs.append(altResourcePacks);
+        }
+        m_resource_pack_list.reset(new ResourcePackFolderModel(dirs));
         m_resource_pack_list->disableInteraction(isRunning());
         connect(this, &BaseInstance::runningStatusChanged, m_resource_pack_list.get(), &ModFolderModel::disableInteraction);
     }
@@ -1055,7 +1070,12 @@ std::shared_ptr<ModFolderModel> MinecraftInstance::texturePackList() const
 {
     if (!m_texture_pack_list)
     {
-        m_texture_pack_list.reset(new TexturePackFolderModel(texturePacksDir()));
+        QStringList dirs = {texturePacksDir()};
+        QString altTexturePacks = FS::PathCombine(instanceRoot(), "texturepacks");
+        if (altTexturePacks != texturePacksDir()) {
+            dirs.append(altTexturePacks);
+        }
+        m_texture_pack_list.reset(new TexturePackFolderModel(dirs));
         m_texture_pack_list->disableInteraction(isRunning());
         connect(this, &BaseInstance::runningStatusChanged, m_texture_pack_list.get(), &ModFolderModel::disableInteraction);
     }
@@ -1066,7 +1086,12 @@ std::shared_ptr<ModFolderModel> MinecraftInstance::shaderPackList() const
 {
     if (!m_shader_pack_list)
     {
-        m_shader_pack_list.reset(new ResourcePackFolderModel(shaderPacksDir()));
+        QStringList dirs = {shaderPacksDir()};
+        QString altShaderPacks = FS::PathCombine(instanceRoot(), "shaderpacks");
+        if (altShaderPacks != shaderPacksDir()) {
+            dirs.append(altShaderPacks);
+        }
+        m_shader_pack_list.reset(new ResourcePackFolderModel(dirs));
         m_shader_pack_list->disableInteraction(isRunning());
         connect(this, &BaseInstance::runningStatusChanged, m_shader_pack_list.get(), &ModFolderModel::disableInteraction);
     }

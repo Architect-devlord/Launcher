@@ -17,6 +17,7 @@
 #include <QFileInfo>
 #include <QDateTime>
 #include <QList>
+#include "ModManifest.h"
 #include <memory>
 
 #include "ModDetails.h"
@@ -45,6 +46,16 @@ public:
     QString mmc_id() const
     {
         return m_mmc_id;
+    }
+
+    QString sourceUrl() const
+    {
+        return m_sourceUrl;
+    }
+
+    void setSourceUrl(const QString &url)
+    {
+        m_sourceUrl = url;
     }
     ModType type() const
     {
@@ -106,6 +117,7 @@ protected:
     QDateTime m_changedDateTime;
     QString m_mmc_id;
     QString m_name;
+    QString m_sourceUrl;
     bool m_enabled = true;
     bool m_resolving = false;
     bool m_resolved = false;

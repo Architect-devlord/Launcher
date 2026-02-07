@@ -39,6 +39,9 @@
 #include <QAccessible>
 #include <QDir>
 #include <QFileInfo>
+#include <QEventLoop>
+#include <net/Download.h>
+#include <minecraft/MinecraftInstance.h>
 #include <QNetworkAccessManager>
 #include <QTranslator>
 #include <QLibraryInfo>
@@ -268,6 +271,12 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
         parser.addOption("import");
         parser.addShortOpt("import", 'I');
         parser.addDocumentation("import", "Import instance from specified zip (local path or URL)");
+        // --list-mods
+        parser.addOption("list-mods");
+        parser.addDocumentation("list-mods", "List mods for the specified instance");
+        // --download-mod
+        parser.addOption("download-mod");
+        parser.addDocumentation("download-mod", "Download a mod from a URL for the specified instance");
 
         // parse the arguments
         try
@@ -311,6 +320,8 @@ Application::Application(int &argc, char **argv) : QApplication(argc, argv)
     }
     m_liveCheck = args["alive"].toBool();
     m_zipToImport = args["import"].toUrl();
+    m_instanceIdToListMods = args["list-mods"].toString();
+    m_modToDownload = args["download-mod"].toUrl();
 
     QString origcwdPath = QDir::currentPath();
     QString binPath = applicationDirPath();
@@ -1108,6 +1119,66 @@ void Application::setupWizardFinished(int status)
 void Application::performMainStartupAction()
 {
     m_status = Application::Initialized;
+    if(!m_instanceIdToListMods.isEmpty())
+    {
+        auto inst = instances()->getInstanceById(m_instanceIdToListMods);
+        if(inst)
+        {
+            auto mcInst = std::dynamic_pointer_cast<MinecraftInstance>(inst);
+            if(mcInst)
+            {
+                auto mods = mcInst->loaderModList();
+                QEventLoop loop;
+                connect(mods.get(), &ModFolderModel::updateFinished, &loop, &QEventLoop::quit);
+                mods->update();
+                loop.exec();
+
+                std::cout << "Mods for instance " << qPrintable(m_instanceIdToListMods) << ":" << std::endl;
+                for(auto & mod: mods->allMods())
+                {
+                    std::cout << "  " << qPrintable(mod.name()) << " (" << qPrintable(mod.filename().fileName()) << ")";
+                    if(!mod.sourceUrl().isEmpty()) {
+                        std::cout << " [Source: " << qPrintable(mod.sourceUrl()) << "]";
+                    }
+                    std::cout << std::endl;
+                }
+            }
+        }
+        m_status = Application::Succeeded;
+        return;
+    }
+
+    if(!m_modToDownload.isEmpty())
+    {
+        if(m_instanceIdToLaunch.isEmpty()) {
+             std::cerr << "--download-mod requires --launch (to specify instance)!" << std::endl;
+             m_status = Application::Failed;
+             return;
+        }
+        auto inst = instances()->getInstanceById(m_instanceIdToLaunch);
+        auto mcInst = std::dynamic_pointer_cast<MinecraftInstance>(inst);
+        if(mcInst) {
+            QString destDir = mcInst->modsRoot();
+            QString fileName = m_modToDownload.fileName();
+            QString destPath = FS::PathCombine(destDir, fileName);
+
+            auto download = Net::Download::makeFile(m_modToDownload, destPath);
+            QEventLoop loop;
+            connect(download.get(), &Net::Download::succeeded, &loop, &QEventLoop::quit);
+            connect(download.get(), &Net::Download::failed, &loop, &QEventLoop::quit);
+            download->start();
+            loop.exec();
+
+            if(download->status() == Net::Download::Succeeded) {
+                std::cout << "Downloaded mod to " << qPrintable(destPath) << std::endl;
+            } else {
+                std::cerr << "Failed to download mod." << std::endl;
+            }
+        }
+        m_status = Application::Succeeded;
+        return;
+    }
+
     if(!m_instanceIdToLaunch.isEmpty())
     {
         auto inst = instances()->getInstanceById(m_instanceIdToLaunch);

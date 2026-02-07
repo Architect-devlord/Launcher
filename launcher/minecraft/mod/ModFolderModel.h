@@ -52,7 +52,7 @@ public:
         Enable,
         Toggle
     };
-    ModFolderModel(const QString &dir);
+    ModFolderModel(const QStringList &dirs, const QString &manifestPath = QString());
 
     virtual QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
     virtual bool setData(const QModelIndex &index, const QVariant &value, int role = Qt::EditRole) override;
@@ -108,9 +108,9 @@ public:
 
     bool isValid();
 
-    QDir dir()
+    QStringList dirs()
     {
-        return m_dir;
+        return m_dirs;
     }
 
     const QList<Mod> & allMods()
@@ -140,7 +140,8 @@ protected:
     ModFolderLoadTask::ResultPtr m_update;
     bool scheduled_update = false;
     bool interaction_disabled = false;
-    QDir m_dir;
+    QStringList m_dirs;
+    std::unique_ptr<ModManifest> m_manifest;
     QMap<QString, int> modsIndex;
     QMap<int, LocalModParseTask::ResultPtr> activeTickets;
     int nextResolutionTicket = 0;

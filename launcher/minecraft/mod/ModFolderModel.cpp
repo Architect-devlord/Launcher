@@ -25,13 +25,18 @@
 #include <QThreadPool>
 #include <algorithm>
 #include "LocalModParseTask.h"
+#include "ModManifest.h"
 
-ModFolderModel::ModFolderModel(const QString &dir) : QAbstractListModel(), m_dir(dir)
+ModFolderModel::ModFolderModel(const QStringList &dirs, const QString &manifestPath) : QAbstractListModel(), m_dirs(dirs)
 {
-    FS::ensureFolderPathExists(m_dir.absolutePath());
-    m_dir.setFilter(QDir::Readable | QDir::NoDotAndDotDot | QDir::Files | QDir::Dirs);
-    m_dir.setSorting(QDir::Name | QDir::IgnoreCase | QDir::LocaleAware);
+    if (!manifestPath.isEmpty()) {
+        m_manifest.reset(new ModManifest(manifestPath));
+    }
     m_watcher = new QFileSystemWatcher(this);
+    for (auto & dirPath : m_dirs)
+    {
+        FS::ensureFolderPathExists(dirPath);
+    }
     connect(m_watcher, SIGNAL(directoryChanged(QString)), this, SLOT(directoryChanged(QString)));
 }
 
@@ -42,14 +47,17 @@ void ModFolderModel::startWatching()
 
     update();
 
-    is_watching = m_watcher->addPath(m_dir.absolutePath());
-    if (is_watching)
+    for (auto & dirPath : m_dirs)
     {
-        qDebug() << "Started watching " << m_dir.absolutePath();
-    }
-    else
-    {
-        qDebug() << "Failed to start watching " << m_dir.absolutePath();
+        if (m_watcher->addPath(dirPath))
+        {
+            qDebug() << "Started watching " << dirPath;
+            is_watching = true;
+        }
+        else
+        {
+            qDebug() << "Failed to start watching " << dirPath;
+        }
     }
 }
 
@@ -58,15 +66,12 @@ void ModFolderModel::stopWatching()
     if(!is_watching)
         return;
 
-    is_watching = !m_watcher->removePath(m_dir.absolutePath());
-    if (!is_watching)
+    for (auto & dirPath : m_dirs)
     {
-        qDebug() << "Stopped watching " << m_dir.absolutePath();
+        m_watcher->removePath(dirPath);
     }
-    else
-    {
-        qDebug() << "Failed to stop watching " << m_dir.absolutePath();
-    }
+    is_watching = false;
+    qDebug() << "Stopped watching mod folders";
 }
 
 bool ModFolderModel::update()
@@ -79,7 +84,7 @@ bool ModFolderModel::update()
         return true;
     }
 
-    auto task = new ModFolderLoadTask(m_dir);
+    auto task = new ModFolderLoadTask(m_dirs);
     m_update = task->result();
     QThreadPool *threadPool = QThreadPool::globalInstance();
     connect(task, &ModFolderLoadTask::succeeded, this, &ModFolderModel::finishUpdate);
@@ -142,7 +147,14 @@ void ModFolderModel::finishUpdate()
         added.subtract(currentSet);
         beginInsertRows(QModelIndex(), mods.size(), mods.size() + added.size() - 1);
         for(auto & addedMod: added) {
-            mods.append(newMods[addedMod]);
+            auto mod = newMods[addedMod];
+            if (m_manifest) {
+                QString filename = mod.filename().fileName();
+                if (m_manifest->contains(filename)) {
+                    mod.setSourceUrl(m_manifest->get(filename).url);
+                }
+            }
+            mods.append(mod);
             resolveMod(mods.last());
         }
         endInsertRows();
@@ -217,7 +229,14 @@ void ModFolderModel::directoryChanged(QString path)
 
 bool ModFolderModel::isValid()
 {
-    return m_dir.exists() && m_dir.isReadable();
+    bool valid = false;
+    for (auto & dirPath : m_dirs)
+    {
+        QDir dir(dirPath);
+        if (dir.exists() && dir.isReadable())
+            valid = true;
+    }
+    return valid;
 }
 
 // FIXME: this does not take disabled mod (with extra .disable extension) into account...
@@ -252,7 +271,9 @@ bool ModFolderModel::installMod(const QString &filename)
         return false;
     }
 
-    auto newpath = FS::NormalizePath(FS::PathCombine(m_dir.path(), fileinfo.fileName()));
+    if (m_dirs.isEmpty())
+        return false;
+    auto newpath = FS::NormalizePath(FS::PathCombine(m_dirs.first(), fileinfo.fileName()));
     if(originalPath == newpath)
     {
         qDebug() << "Overwriting the mod (" << originalPath << ") with itself makes no sense...";
@@ -276,6 +297,12 @@ bool ModFolderModel::installMod(const QString &filename)
             qWarning() << "Copy from" << originalPath << "to" << newpath << "has failed.";
             // FIXME: report error in a user-visible way
             return false;
+        }
+        if (m_manifest) {
+            ModManifestEntry entry;
+            entry.name = fileinfo.completeBaseName();
+            entry.url = "local";
+            m_manifest->insert(fileinfo.fileName(), entry);
         }
         FS::updateTimestamp(newpath);
         installedMod.repath(newpath);

@@ -7,6 +7,7 @@
 #include <QIcon>
 #include <QDateTime>
 #include <QUrl>
+#include <iostream>
 #include <updater/GoUpdate.h>
 
 #include <BaseInstance.h>
@@ -26,6 +27,7 @@ class InstanceList;
 class AccountList;
 class IconList;
 class QNetworkAccessManager;
+class Download;
 class JavaInstallList;
 class UpdateChecker;
 class BaseProfilerFactory;
@@ -242,5 +244,7 @@ public:
     QString m_offlineName;
     bool m_liveCheck = false;
     QUrl m_zipToImport;
+    QString m_instanceIdToListMods;
+    QUrl m_modToDownload;
     std::unique_ptr<QFile> logFile;
 };

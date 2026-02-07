@@ -19,11 +19,11 @@ public:
     }
 
 public:
-    ModFolderLoadTask(QDir dir);
+    ModFolderLoadTask(QStringList dirs);
     void run();
 signals:
     void succeeded();
 private:
-    QDir m_dir;
+    QStringList m_dirs;
     ResultPtr m_result;
 };

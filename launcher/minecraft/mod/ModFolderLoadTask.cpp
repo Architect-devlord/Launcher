@@ -1,18 +1,26 @@
 #include "ModFolderLoadTask.h"
 #include <QDebug>
 
-ModFolderLoadTask::ModFolderLoadTask(QDir dir) :
-    m_dir(dir), m_result(new Result())
+ModFolderLoadTask::ModFolderLoadTask(QStringList dirs) :
+    m_dirs(dirs), m_result(new Result())
 {
 }
 
 void ModFolderLoadTask::run()
 {
-    m_dir.refresh();
-    for (auto entry : m_dir.entryInfoList())
+    for (auto & dirPath : m_dirs)
     {
-        Mod m(entry);
-        m_result->mods[m.mmc_id()] = m;
+        QDir dir(dirPath);
+        if (!dir.exists())
+            continue;
+        dir.setFilter(QDir::Readable | QDir::NoDotAndDotDot | QDir::Files | QDir::Dirs);
+        dir.setSorting(QDir::Name | QDir::IgnoreCase | QDir::LocaleAware);
+        dir.refresh();
+        for (auto entry : dir.entryInfoList())
+        {
+            Mod m(entry);
+            m_result->mods[m.mmc_id()] = m;
+        }
     }
     emit succeeded();
 }
